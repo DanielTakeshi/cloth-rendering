@@ -1,0 +1,4 @@
+*.swp
+*.swo
+images/*
+image_masks*

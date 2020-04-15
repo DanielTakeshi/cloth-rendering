@@ -30,12 +30,14 @@ def clear_scene():
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
+
 def make_table():
     # Generate table surface
     bpy.ops.mesh.primitive_plane_add(size=3, location=(0,0,-1))
     bpy.ops.mesh.primitive_plane_add(size=3, location=(0,0,0))
     bpy.ops.object.modifier_add(type='COLLISION')
     return bpy.context.object
+
 
 def make_cloth():
     '''Create cloth and generate new state'''
@@ -53,6 +55,7 @@ def make_cloth():
     bpy.context.object.modifiers["Solidify"].thickness = 0.1
     bpy.context.object.modifiers["Cloth"].collision_settings.use_self_collision = True
     return bpy.context.object
+
 
 def generate_cloth_state(cloth):
     # Move cloth slightly above the table and simulate a drop
@@ -72,14 +75,16 @@ def generate_cloth_state(cloth):
     pinned_group.add(subsample, 1.0, 'ADD')
     cloth.modifiers["Cloth"].settings.vertex_group_mass = 'Pinned'
     # Episode length = 30 frames
-    bpy.context.scene.frame_start = 0 
+    bpy.context.scene.frame_start = 0
     bpy.context.scene.frame_end = 30 # Roughly when the cloth settles
     return cloth
+
 
 def reset_cloth(cloth):
     cloth.modifiers["Cloth"].settings.vertex_group_mass = ''
     cloth.location = (0,0,0)
     bpy.context.scene.frame_set(0)
+
 
 def set_viewport_shading(mode):
     '''Makes color/texture viewable in viewport'''
@@ -88,6 +93,7 @@ def set_viewport_shading(mode):
         for space in area.spaces:
             if space.type == 'VIEW_3D':
                 space.shading.type = mode
+
 
 def pattern(obj, texture_filename):
     '''Add image texture to object'''
@@ -99,6 +105,7 @@ def pattern(obj, texture_filename):
     mat.node_tree.links.new(bsdf.inputs['Base Color'], texImage.outputs['Color'])
     obj.data.materials.append(mat)
 
+
 def colorize(obj, color):
     '''Add color to object'''
     mat = bpy.data.materials.new(name="Color")
@@ -107,10 +114,12 @@ def colorize(obj, color):
     obj.data.materials.append(mat)
     set_viewport_shading('MATERIAL')
 
+
 def add_camera_light():
     bpy.ops.object.light_add(type='SUN', radius=1, location=(0,0,0))
     bpy.ops.object.camera_add(location=(0,0,8), rotation=(0,0,0))
     bpy.context.scene.camera = bpy.context.object
+
 
 def render(filename, engine, episode, cloth, render_size, annotations=None, num_annotations=0):
     scene = bpy.context.scene
@@ -130,7 +139,7 @@ def render(filename, engine, episode, cloth, render_size, annotations=None, num_
     for frame in range(0, scene.frame_end):
         # Render 10 images per episode (episode is really 30 frames)
         if frame%3==0:
-            index = ((scene.frame_end - scene.frame_start)*episode + frame)//3 
+            index = ((scene.frame_end - scene.frame_start)*episode + frame)//3
             render_mask("image_masks/%06d_visible_mask.png", index)
             scene.render.filepath = filename % index
             bpy.ops.render.render(write_still=True)
@@ -140,6 +149,7 @@ def render(filename, engine, episode, cloth, render_size, annotations=None, num_
         # Baking the simulation seems too time-consuming..., so for now just stepping through the frames
         scene.frame_set(frame)
     return annotations
+
 
 def render_mask(filename, index):
     # NOTE: this method is still in progress
@@ -163,20 +173,21 @@ def render_mask(filename, index):
     links.new(math_node.outputs[0], composite.inputs["Image"])
     scene.render.filepath = filename % index
     bpy.ops.render.render(write_still=True)
-    # Clean up 
+    # Clean up
     scene.render.engine = saved
     for node in tree.nodes:
         if node.name != "Render Layers":
             tree.nodes.remove(node)
     scene.use_nodes = False
 
+
 def annotate(cloth, frame, mapping, num_annotations, render_size):
     '''Gets num_annotations annotations of cloth image at provided frame #, adds to mapping'''
     scene = bpy.context.scene
     depsgraph = bpy.context.evaluated_depsgraph_get()
     cloth_deformed = cloth.evaluated_get(depsgraph)
-    #vertices = [cloth_deformed.matrix_world @ v.co for v in list(cloth_deformed.data.vertices)[::len(list(cloth_deformed.data.vertices))//num_annotations]] 
-    vertices = [cloth_deformed.matrix_world @ v.co for v in list(cloth_deformed.data.vertices)[::num_annotations]] 
+    #vertices = [cloth_deformed.matrix_world @ v.co for v in list(cloth_deformed.data.vertices)[::len(list(cloth_deformed.data.vertices))//num_annotations]]
+    vertices = [cloth_deformed.matrix_world @ v.co for v in list(cloth_deformed.data.vertices)[::num_annotations]]
     pixels = []
     for i in range(len(vertices)):
         v = vertices[i]
@@ -186,8 +197,9 @@ def annotate(cloth, frame, mapping, num_annotations, render_size):
     mapping[frame] = pixels
     return mapping
 
+
 def render_dataset(num_episodes, filename, num_annotations, texture_filepath='', render_width=640, render_height=480, color=None):
-    # Remove anything in scene 
+    # Remove anything in scene
     scene = bpy.context.scene
     scene.render.resolution_percentage = 100
     render_scale = scene.render.resolution_percentage / 100
@@ -215,7 +227,8 @@ def render_dataset(num_episodes, filename, num_annotations, texture_filepath='',
         annot = render(filename, engine, episode, cloth, render_size, annotations=annot, num_annotations=num_annotations) # Render, save ground truth
     with open("./images/knots_info.json", 'w') as outfile:
         json.dump(annot, outfile, sort_keys=True, indent=2)
-    
+
+
 if __name__ == '__main__':
     if not os.path.exists("./images"):
         os.makedirs('./images')
@@ -231,7 +244,7 @@ if __name__ == '__main__':
     #texture_filepath = 'textures/qr.png'
     green = (0,0.5,0.5,1)
     filename = "images/%06d_rgb.png"
-    episodes = 1 # Note each episode has 10 rendered frames 
+    episodes = 1 # Note each episode has 10 rendered frames
     num_annotations = 200 # Pixelwise annotations per image
     #render_dataset(episodes, filename, num_annotations, color=green)
     start = time.time()
